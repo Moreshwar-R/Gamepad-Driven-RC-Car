@@ -12,9 +12,9 @@
 ---
 
 <p align="center">
-  <img src="docs/images/rc_car_top.jpg" width="380" alt="ESP32 Bluetooth RC Car — top view"/>
+  <img src="docs/images/rc_car_top.jpeg" width="380" alt="ESP32 Bluetooth RC Car — top view"/>
   &nbsp;&nbsp;
-  <img src="docs/images/rc_car_side.jpg" width="380" alt="ESP32 Bluetooth RC Car — side view"/>
+  <img src="docs/images/rc_car_side.jpeg" width="380" alt="ESP32 Bluetooth RC Car — side view"/>
   <br/>
   <em>Bluetooth-controlled RC car · ESP32 + BTS7960 · arcade-drive control</em>
 </p>
@@ -28,7 +28,7 @@
 - **Result** — Console-grade feel: ~20 ms latency, room-scale range, zero app maintenance, plug-and-play with any standard BT gamepad.
 
 <p align="center">
-  <img src="docs/images/controller.png" width="320" alt="Cosmic Byte Ares C3070W"/>
+  <img src="docs/images/controller.jpeg" width="320" alt="Cosmic Byte Ares C3070W"/>
   <br/>
   <em>Cosmic Byte Ares C3070W — Bluetooth HID gamepad</em>
 </p>
