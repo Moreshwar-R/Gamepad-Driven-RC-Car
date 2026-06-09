@@ -12,9 +12,11 @@
 ---
 
 <p align="center">
-  <img src="docs/images/rc_car.jpg" width="520" alt="ESP32 Bluetooth RC Car"/>
+  <img src="docs/images/rc_car_top.jpg" width="380" alt="ESP32 Bluetooth RC Car — top view"/>
+  &nbsp;&nbsp;
+  <img src="docs/images/rc_car_side.jpg" width="380" alt="ESP32 Bluetooth RC Car — side view"/>
   <br/>
-  <em>Bluetooth-controlled RC car · ESP32 + TB6612FNG · arcade-drive control</em>
+  <em>Bluetooth-controlled RC car · ESP32 + BTS7960 · arcade-drive control</em>
 </p>
 
 ---
