@@ -60,7 +60,7 @@ Full BOM → [`docs/BOM.md`](docs/BOM.md) · Wiring → [`docs/wiring.md`](docs/
 
 Two sketches, flashed in order. Stage 1 proves the wireless link. Stage 2 adds motion.
 
-### 🕹️ `01_joystick_test.ino` — Gamepad ↔ ESP32 Link
+### 🕹️ [`01_joystick_test.ino`](firmware/01_joystick_test/01_joystick_test.ino) — Gamepad ↔ ESP32 Link
 
 **Goal:** Confirm the controller pairs and streams clean data before any motor is wired in.
 
@@ -72,7 +72,7 @@ Two sketches, flashed in order. Stage 1 proves the wireless link. Stage 2 adds m
 - Streams stick values + button states to serial @ **115200 baud**
 - Prints the ESP32's **Bluetooth address** on boot for pairing reference
 
-### 🚗 `02_rc_drive.ino` — Full Motion Control
+### 🚗 [`02_rc_drive.ino`](firmware/02_rc_drive/02_rc_drive.ino) — Full Motion Control
 
 **Goal:** Turn two analog joystick axes into smooth, steerable wheel motion.
 
