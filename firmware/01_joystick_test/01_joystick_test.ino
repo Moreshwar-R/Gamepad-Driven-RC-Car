@@ -1,30 +1,3 @@
-/*
- * ============================================================================
- *  01_joystick_test.ino — Gamepad ↔ ESP32 Link Verification
- * ============================================================================
- *  Project : ESP32 Bluetooth RC Car
- *  Stage   : 1 of 2  (wireless link bring-up — NO motors yet)
- *  Author  : Moreshwar R
- *  Board   : ESP32 Dev Module (30-pin, CH9102X)
- *  Library : Bluepad32 (install via Arduino Library Manager)
- *
- *  Purpose
- *  -------
- *  Confirms the Cosmic Byte Ares C3070W (or any Bluetooth HID gamepad)
- *  pairs cleanly with the ESP32 and streams valid stick + button data
- *  over serial. Flash this BEFORE the drive sketch — if this prints
- *  clean values, the wireless link is solid.
- *
- *  Serial Output
- *  -------------
- *  - Firmware version + ESP32 Bluetooth (BD) address on boot
- *  - Live left-stick-Y and right-stick-X values @ 100 Hz
- *  - Button A (Cross) press events
- *
- *  Baud rate: 115200
- * ============================================================================
- */
-
 #include <Bluepad32.h>
 
 ControllerPtr myController;
