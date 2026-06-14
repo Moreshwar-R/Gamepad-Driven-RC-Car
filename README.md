@@ -39,8 +39,8 @@
 
 ```
 ┌─────────────────┐   BT HID    ┌──────────────┐   GPIO   ┌─────────────┐   ±7.4V   ┌──────────┐
-│  Cosmic Byte    │ ─────────►  │  ESP32 DevKit│ ───────► │  TB6612FNG  │ ────────► │ N20 × 2  │
-│  Ares C3070W    │             │      V1      │   PWM    │   H-Bridge  │           │  motors  │
+│  Cosmic Byte    │ ─────────►  │  ESP32 DevKit│ ───────► │ BTS7960 ×2  │ ────────► │ Johnson  │
+│  Ares C3070W    │             │      V1      │   PWM    │  H-Bridges  │           │ motors×4 │
 └─────────────────┘             └──────────────┘          └─────────────┘           └──────────┘
                                        ▲                         ▲
                                        │                         │
@@ -88,7 +88,7 @@ Two sketches, flashed in order. Stage 1 proves the wireless link. Stage 2 adds m
 - **Hardware PWM** — 1 kHz, 8-bit, generated directly by the ESP32 (no CPU bit-banging)
 - **Safety interlocks:**
   - 20-count deadzone on both axes
-  - `STBY` pin pulled LOW on controller disconnect → H-bridge gates off instantly
+  - Master `EN` pin pulled LOW on controller disconnect → both BTS7960 bridges gate off instantly
   - Per-motor `constrain()` so integer overflow can't latch a full-throttle spin
 
 ---
@@ -96,16 +96,20 @@ Two sketches, flashed in order. Stage 1 proves the wireless link. Stage 2 adds m
 ## 🔌 Pinout
 
 ```
-ESP32              TB6612FNG
-─────              ─────────
-GPIO 12   ───────► PWMA
-GPIO 14   ───────► AIN1
-GPIO 27   ───────► AIN2
-GPIO 13   ───────► PWMB
-GPIO 26   ───────► BIN1
-GPIO 25   ───────► BIN2
-GPIO 33   ───────► STBY    (HIGH = enable, LOW = motors off)
+ESP32              BTS7960 (×2)
+─────              ────────────
+GPIO 12   ───────► L_RPWM    (left driver  — forward PWM)
+GPIO 14   ───────► L_LPWM    (left driver  — reverse PWM)
+GPIO 13   ───────► R_RPWM    (right driver — forward PWM)
+GPIO 26   ───────► R_LPWM    (right driver — reverse PWM)
+GPIO 33   ───────► EN        (tied to L_EN + R_EN on BOTH drivers)
+                              HIGH = bridges enabled
+                              LOW  = full coast / fail-safe
+
+Free GPIOs : 27, 25  (available for encoders, IMU, etc.)
 ```
+
+> 💡 **Why dual-PWM instead of one-PWM-plus-direction?** The BTS7960's RPWM/LPWM pins each drive one half of the H-bridge directly. Switching direction via two PWM lines gives you cleaner braking and avoids shoot-through, since RPWM and LPWM are never both high at once in the firmware.
 
 ---
 
@@ -150,7 +154,7 @@ cd ESP32-BT-RC-Car
 
 - **Pair the controller before you trust the code** — flashing the joystick-test sketch alone saved hours of *"is it the controller, the code, or the motor driver?"* debugging later.
 - **Untouched sticks still move** — without a 15-count deadzone, idle drift creeps the bot across the floor on its own.
-- **A dropped controller is a runaway bot** — pulling `STBY` LOW on disconnect kills the H-bridge instantly. Fail-safes have to live in firmware, not in the README.
+- **A dropped controller is a runaway bot** — gating the H-bridge enable LOW on disconnect kills the drivers instantly. Fail-safes have to live in firmware, not in the README.
 - **Two lines of math change the whole feel** — `left = throttle + steering`, `right = throttle - steering` turned a tank chassis into something that drives like a car.
 
 ---
@@ -166,7 +170,7 @@ cd ESP32-BT-RC-Car
 ![bluepad32](https://img.shields.io/badge/-bluepad32-1E90FF?style=flat-square)
 ![gamepad](https://img.shields.io/badge/-gamepad-6A1B9A?style=flat-square)
 ![hid](https://img.shields.io/badge/-hid-455A64?style=flat-square)
-![tb6612fng](https://img.shields.io/badge/-tb6612fng-37474F?style=flat-square)
+![bts7960](https://img.shields.io/badge/-bts7960-37474F?style=flat-square)
 ![pwm](https://img.shields.io/badge/-pwm-F57C00?style=flat-square)
 ![motor-control](https://img.shields.io/badge/-motor--control-5D4037?style=flat-square)
 ![arcade-drive](https://img.shields.io/badge/-arcade--drive-7B1FA2?style=flat-square)
