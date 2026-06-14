@@ -1,87 +1,56 @@
-/*
- * ============================================================================
- *  02_rc_drive.ino — Full Motion Control (Arcade-Drive Mixing)
- * ============================================================================
- *  Project : ESP32 Bluetooth RC Car
- *  Stage   : 2 of 2  (full drive firmware — motors live)
- *  Author  : Moreshwar R
- *  Board   : ESP32 Dev Module (30-pin, CH9102X)
- *  Library : Bluepad32 (install via Arduino Library Manager)
- *
- *  Purpose
- *  -------
- *  Converts two analog joystick axes into smooth, steerable wheel motion
- *  using arcade-drive mixing. Drives a TB6612FNG dual H-bridge with
- *  hardware PWM via the ESP32 LEDC peripheral.
- *
- *  Control Logic
- *  -------------
- *      throttle  = -axisY        (invert so stick-up = forward)
- *      steering  =  axisRX
- *      leftWheel  = throttle + steering
- *      rightWheel = throttle - steering
- *
- *  Range remap : Bluepad32 raw [-511, 512] → PWM duty [-255, 255]
- *
- *  Safety Interlocks
- *  -----------------
- *  - 20-count deadzone on both axes (idle stick drift rejection)
- *  - STBY pin pulled LOW on controller disconnect (H-bridge gated off)
- *  - Per-motor constrain() to clip overflow / runaway
- *
- *  Baud rate: 115200
- * ============================================================================
- */
-
 #include <Bluepad32.h>
 
 // ---------------------------------------------------------------------------
-//  Pin Map — ESP32 → TB6612FNG
+//  Pin Map — ESP32 → BTS7960 ×2 (canonical dual-PWM interface)
 // ---------------------------------------------------------------------------
-#define PWMA  12   // Motor A speed (PWM)
-#define AIN1  14   // Motor A direction 1
-#define AIN2  27   // Motor A direction 2
-#define PWMB  13   // Motor B speed (PWM)
-#define BIN1  26   // Motor B direction 1
-#define BIN2  25   // Motor B direction 2
-#define STBY  33   // Standby — HIGH = enable, LOW = motors off
+#define L_RPWM  12   // Left driver  — forward PWM
+#define L_LPWM  14   // Left driver  — reverse PWM
+#define R_RPWM  13   // Right driver — forward PWM
+#define R_LPWM  26   // Right driver — reverse PWM
+#define EN      33   // Tied to L_EN + R_EN on BOTH drivers
+                     //   HIGH = bridges enabled,  LOW = full coast / fail-safe
 
 // ---------------------------------------------------------------------------
 //  PWM Configuration
+//  20 kHz keeps the BTS7960 above the audible band (no whine) and well
+//  inside its 25 kHz max switching spec.
 // ---------------------------------------------------------------------------
-const int PWMFreq       = 1000;   // 1 kHz carrier
+const int PWMFreq       = 20000;  // 20 kHz carrier
 const int PWMResolution = 8;      // 8-bit duty (0–255)
-const int channelA      = 0;      // LEDC channel for Motor A
-const int channelB      = 1;      // LEDC channel for Motor B
+
+// LEDC channel assignment — one per PWM pin (4 total)
+const int chL_R = 0;   // Left  RPWM
+const int chL_L = 1;   // Left  LPWM
+const int chR_R = 2;   // Right RPWM
+const int chR_L = 3;   // Right LPWM
 
 ControllerPtr myController;
 
 // ---------------------------------------------------------------------------
 //  Low-level motor driver
-//  motor : 0 → Motor A (left)   |   1 → Motor B (right)
-//  speed : signed PWM duty  ( + forward,  - reverse,  0 coast )
+//  motor : 0 → left   |   1 → right
+//  speed : signed PWM duty  ( + forward,  - reverse,  0 brake )
 // ---------------------------------------------------------------------------
 void setMotor(int motor, int speed) {
-  int pin1, pin2, pwmChannel;
+  int rpwmCh, lpwmCh;
 
-  if (motor == 0) {            // Motor A
-    pin1 = AIN1;  pin2 = AIN2;  pwmChannel = channelA;
-  } else {                     // Motor B
-    pin1 = BIN1;  pin2 = BIN2;  pwmChannel = channelB;
+  if (motor == 0) {              // Left driver
+    rpwmCh = chL_R;  lpwmCh = chL_L;
+  } else {                       // Right driver
+    rpwmCh = chR_R;  lpwmCh = chR_L;
   }
 
-  if (speed > 0) {             // Forward
-    digitalWrite(pin1, HIGH);
-    digitalWrite(pin2, LOW);
-    ledcWrite(pwmChannel, speed);
-  } else if (speed < 0) {      // Reverse
-    digitalWrite(pin1, LOW);
-    digitalWrite(pin2, HIGH);
-    ledcWrite(pwmChannel, abs(speed));
-  } else {                     // Coast / stop
-    digitalWrite(pin1, LOW);
-    digitalWrite(pin2, LOW);
-    ledcWrite(pwmChannel, 0);
+  speed = constrain(speed, -255, 255);
+
+  if (speed > 0) {               // Forward: drive RPWM, hold LPWM low
+    ledcWrite(rpwmCh, speed);
+    ledcWrite(lpwmCh, 0);
+  } else if (speed < 0) {        // Reverse: drive LPWM, hold RPWM low
+    ledcWrite(rpwmCh, 0);
+    ledcWrite(lpwmCh, -speed);
+  } else {                       // Brake (both low while EN stays HIGH)
+    ledcWrite(rpwmCh, 0);
+    ledcWrite(lpwmCh, 0);
   }
 }
 
@@ -92,6 +61,9 @@ void onConnectedController(ControllerPtr ctl) {
   if (myController == nullptr) {
     Serial.println("CALLBACK: Controller connected");
     myController = ctl;
+
+    // Re-enable bridges now that we have a valid command source
+    digitalWrite(EN, HIGH);
   }
 }
 
@@ -100,8 +72,8 @@ void onDisconnectedController(ControllerPtr ctl) {
     Serial.println("CALLBACK: Controller disconnected");
     myController = nullptr;
 
-    // Fail-safe: gate the H-bridge OFF instantly
-    digitalWrite(STBY, LOW);
+    // Fail-safe: gate both BTS7960 bridges OFF instantly
+    digitalWrite(EN, LOW);
   }
 }
 
@@ -111,23 +83,27 @@ void onDisconnectedController(ControllerPtr ctl) {
 void setup() {
   Serial.begin(115200);
 
-  // 1. Motor direction pins
-  pinMode(AIN1, OUTPUT);
-  pinMode(AIN2, OUTPUT);
-  pinMode(BIN1, OUTPUT);
-  pinMode(BIN2, OUTPUT);
-  pinMode(STBY, OUTPUT);
+  // 1. Enable line — start LOW until controller is paired
+  pinMode(EN, OUTPUT);
+  digitalWrite(EN, LOW);
 
-  // 2. Enable the motor driver
-  digitalWrite(STBY, HIGH);
+  // 2. Hardware PWM via LEDC — attach all 4 PWM pins
+  ledcSetup(chL_R, PWMFreq, PWMResolution);
+  ledcSetup(chL_L, PWMFreq, PWMResolution);
+  ledcSetup(chR_R, PWMFreq, PWMResolution);
+  ledcSetup(chR_L, PWMFreq, PWMResolution);
+  ledcAttachPin(L_RPWM, chL_R);
+  ledcAttachPin(L_LPWM, chL_L);
+  ledcAttachPin(R_RPWM, chR_R);
+  ledcAttachPin(R_LPWM, chR_L);
 
-  // 3. Hardware PWM via LEDC
-  ledcSetup(channelA, PWMFreq, PWMResolution);
-  ledcSetup(channelB, PWMFreq, PWMResolution);
-  ledcAttachPin(PWMA, channelA);
-  ledcAttachPin(PWMB, channelB);
+  // 3. Make sure everything starts at zero duty
+  ledcWrite(chL_R, 0);
+  ledcWrite(chL_L, 0);
+  ledcWrite(chR_R, 0);
+  ledcWrite(chR_L, 0);
 
-  // 4. Bluepad32 setup
+  // 4. Bluepad32 setup — bridges stay disabled until a controller pairs
   BP32.setup(&onConnectedController, &onDisconnectedController);
   BP32.enableVirtualDevice(false);
 }
@@ -163,14 +139,14 @@ void processGamepad(ControllerPtr ctl) {
 
   // ----- Arcade-drive mixing -----
   // If the bot turns the wrong way, swap the + and - here
-  int speedA = mThrottle + mSteering;   // left
-  int speedB = mThrottle - mSteering;   // right
+  int speedL = mThrottle + mSteering;   // left
+  int speedR = mThrottle - mSteering;   // right
 
   // Clip to PWM-safe range
-  speedA = constrain(speedA, -255, 255);
-  speedB = constrain(speedB, -255, 255);
+  speedL = constrain(speedL, -255, 255);
+  speedR = constrain(speedR, -255, 255);
 
   // Drive
-  setMotor(0, speedA);
-  setMotor(1, speedB);
+  setMotor(0, speedL);
+  setMotor(1, speedR);
 }
