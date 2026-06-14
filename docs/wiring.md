@@ -17,10 +17,6 @@ This document maps every connection from the ESP32 to the BTS7960 motor drivers,
 | 5 V | **VCC (both drivers)** | Power | Logic-side power for BTS7960 control inputs |
 | GND | **GND (both drivers)** | — | Common ground |
 
-> ⚙️ All four PWM pins use the ESP32's **LEDC hardware PWM peripheral** at **20 kHz, 8-bit** — above the audible band and well inside the BTS7960's 25 kHz max switching spec.
-
-> 🔗 **Tying the enables**: jumper `L_EN` and `R_EN` together on each driver, then run a single wire from that pair on each driver back to **GPIO 33**. Four BTS7960 enable pins total → one ESP32 GPIO.
-
 ---
 
 ## ⚙️ BTS7960 → Motors
@@ -97,26 +93,3 @@ Each BTS7960 has two motor output terminals labelled **M+** and **M−** (someti
 ```
 
 ---
-
-## 📝 Practical Wiring Notes
-
-- **Decoupling capacitor (100 µF, electrolytic)** across each BTS7960's VM ↔ GND is strongly recommended — absorbs back-EMF spikes from the motors that can otherwise reset the ESP32 over the shared ground.
-- **Keep motor wires short** to reduce EMI on the ESP32's Bluetooth antenna. Twist each motor's two leads together if you can.
-- **14 AWG silicone wire** for the battery → driver power path. Thin wires create voltage drop under load — especially critical with BTS7960s that can pull 40+ A peak.
-- **Solder all power connections.** Loose breadboard joints sag under stall current and can desolder themselves from the heat.
-- **EN tie-point**: the cleanest place to tie L_EN + R_EN together is right on each BTS7960's pin header — a single jumper wire across the two adjacent pins, then a single signal wire from each driver back to GPIO 33.
-
----
-
-## 🧪 Bring-Up Checklist
-
-Before powering the bot for the first time:
-
-- [ ] All grounds tied together (ESP32, both BTS7960s, LM2596, battery negative)
-- [ ] LM2596 output measured at 5.0 V (with multimeter, **before** ESP32 connected)
-- [ ] L_EN + R_EN jumpered on each BTS7960, and both driver pairs wired to GPIO 33
-- [ ] All four PWM lines (GPIO 12, 14, 13, 26) confirmed at the correct RPWM/LPWM pin per side
-- [ ] VCC (5 V) and VM (battery) **not** swapped — measure with multimeter before applying battery
-- [ ] Motor outputs match expected sides (test by flashing `02_rc_drive` and pushing forward)
-- [ ] Battery connector polarity verified — red to VM+, black to VM−
-- [ ] First power-on done **without motors attached** to verify ESP32 boots normally and EN stays LOW until pairing
